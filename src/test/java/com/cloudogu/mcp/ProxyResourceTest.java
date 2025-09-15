@@ -16,21 +16,13 @@
 
 package com.cloudogu.mcp;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Writer;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class SampleServlet extends HttpServlet {
-
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    try (PrintWriter writer = resp.getWriter()) {
-      writer.println("<h1>Sample Servlet</h1>");
-    }
+class ProxyResourceTest {
+  @Test
+  void justAPlaceholder() {
+    assertTrue(true);
   }
 }

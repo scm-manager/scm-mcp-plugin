@@ -23,15 +23,17 @@ dependencies {
   // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
   // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
   implementation "io.modelcontextprotocol.sdk:mcp:0.12.0"
+  optionalPlugin "sonia.scm.plugins:scm-content-search-plugin:3.0.0"
 }
 
 scmPlugin {
-  scmVersion = "3.0.0"
+  scmVersion = "3.10.3-SNAPSHOT"
   displayName = "mcp"
   description = "Simple MCP Server for SCM-Manager"
+  avatarUrl = '/images/mcp-logo.png'
 
-  // author = "Your name"
-  // category = "Workflow"
+  author = "Cloudogu GmbH"
+  category = "Library"
 
   /*openapi {
     packages = [

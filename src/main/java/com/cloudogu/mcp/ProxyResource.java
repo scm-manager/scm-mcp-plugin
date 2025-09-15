@@ -16,7 +16,11 @@
 
 package com.cloudogu.mcp;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.server.McpServer;
+import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
+import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.inject.Inject;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,55 +28,77 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Context;
+import lombok.extern.slf4j.Slf4j;
+import sonia.scm.EagerSingleton;
 
 import java.io.IOException;
+import java.util.Set;
 
-/**
- * A JAX-RS resource that acts as a proxy, forwarding requests
- * to another servlet.
- */
+@Slf4j
 @Path("mcp")
+@EagerSingleton
 public class ProxyResource {
 
-  // The path to the target servlet within the web application.
-  private static final String TARGET_SERVLET_PATH = "/internal/legacy-servlet";
-
-  private HttpServletStreamableServerTransportProvider sampleServlet;
+  private final Set<Tool> tools;
+  private final HttpServletStreamableServerTransportProvider transportProvider;
 
   @Inject
-  public ProxyResource(HttpServletStreamableServerTransportProvider sampleServlet) {
-    this.sampleServlet = sampleServlet;
+  public ProxyResource(Set<Tool> tools, ObjectMapper objectMapper) {
+    this.tools = tools;
+    this.transportProvider = initMcp(objectMapper);
   }
 
-  /**
-   * Handles GET requests and forwards them.
-   * The "{subpath:.*}" captures the entire path after /my-proxy/
-   */
+  private HttpServletStreamableServerTransportProvider initMcp(ObjectMapper objectMapper) {
+    var transportProvider = HttpServletStreamableServerTransportProvider.builder()
+      .objectMapper(objectMapper)
+      .mcpEndpoint("/api/mcp")
+      .build();
+
+    var server = McpServer.sync(transportProvider)
+      .serverInfo("scm-manager", "0.0.1")
+      .immediateExecution(true)
+      .capabilities(McpSchema.ServerCapabilities.builder()
+        .resources(true, false)
+        .tools(true)
+        .prompts(false)
+        .logging()
+        .build())
+      .build();
+
+    tools.forEach(
+      tool -> server.addTool(
+        McpServerFeatures.SyncToolSpecification.builder()
+          .tool(
+            McpSchema.Tool.builder()
+              .name(tool.getName())
+              .description(tool.getDescription())
+              .inputSchema(tool.getInputSchema())
+              .build()
+          )
+          .callHandler(tool.getCallHandler())
+          .build()
+      )
+    );
+
+    return transportProvider;
+  }
+
   @GET
   @Path("")
-  public void handleGet(
-    @Context HttpServletRequest request,
-    @Context HttpServletResponse response) throws ServletException, IOException {
-
+  public void handleGet(@Context HttpServletRequest request,
+                        @Context HttpServletResponse response) throws ServletException, IOException {
     forwardRequest(request, response);
   }
 
   @POST
   @Path("")
-  public void handlePost(
-    @Context HttpServletRequest request,
-    @Context HttpServletResponse response) throws ServletException, IOException {
-
+  public void handlePost(@Context HttpServletRequest request,
+                         @Context HttpServletResponse response) throws ServletException, IOException {
     forwardRequest(request, response);
   }
 
-  /**
-   * The core forwarding logic.
-   */
-  private void forwardRequest(HttpServletRequest request, HttpServletResponse response)
-    throws ServletException, IOException {
-    sampleServlet.service(request, response);
+  private void forwardRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+      transportProvider.service(request, response);
   }
 }
