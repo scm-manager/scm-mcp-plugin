@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2020 - present Cloudogu GmbH
+ *
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see https://www.gnu.org/licenses/.
+ */
+
+plugins {
+  id 'org.scm-manager.smp' version '0.18.0'
+}
+
+dependencies {
+  // define dependencies to other plugins here e.g.:
+  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
+  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
+  implementation "io.modelcontextprotocol.sdk:mcp:0.12.0"
+}
+
+scmPlugin {
+  scmVersion = "3.0.0"
+  displayName = "mcp"
+  description = "Simple MCP Server for SCM-Manager"
+
+  // author = "Your name"
+  // category = "Workflow"
+
+  /*openapi {
+    packages = [
+      "com.cloudogu.mcp"
+    ]
+  }*/
+}
+
+// fix resolution error
+configurations.all {
+  resolutionStrategy {
+    force 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+  }
+}
