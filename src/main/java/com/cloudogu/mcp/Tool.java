@@ -39,4 +39,9 @@ public interface Tool {
     }
     return request.arguments().get(argumentName);
   }
+
+  @SuppressWarnings("unchecked")
+  default <T> T getRequiredArgument(McpSchema.CallToolRequest request, String argumentName, T defaultValue) {
+    return (T) request.arguments().getOrDefault(argumentName, defaultValue);
+  }
 }

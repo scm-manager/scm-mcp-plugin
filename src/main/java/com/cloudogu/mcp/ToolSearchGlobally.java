@@ -121,10 +121,10 @@ public class ToolSearchGlobally implements Tool {
   }
 
   private McpSchema.CallToolResult search(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
-    String query = request.arguments().get("query").toString();
-    String type = request.arguments().get("type").toString();
-    int page = (Integer) request.arguments().get("page");
-    int pageSize = (Integer) request.arguments().get("pageSize");
+    String query = getRequiredArgument(request, "query").toString();
+    String type = getRequiredArgument(request, "type", "repository");
+    int page = getRequiredArgument(request, "page", 0);
+    int pageSize = getRequiredArgument(request, "pageSize", 10);
 
     QueryBuilder<Object> queryBuilder = searchEngine.forType(type)
       .search()

@@ -115,7 +115,7 @@ class ToolCreateRepository implements Tool {
     return (exchange, request) -> {
       String namespace = request.arguments().get("namespace") == null ? null : request.arguments().get("namespace").toString();
       String name = getRequiredArgument(request, "name").toString();
-      String type = getRequiredArgument(request, "type").toString();
+      String type = getRequiredArgument(request, "type", "git");
 
       try {
         Repository repository = repositoryManager.create(new Repository(null, type, namespace, name));

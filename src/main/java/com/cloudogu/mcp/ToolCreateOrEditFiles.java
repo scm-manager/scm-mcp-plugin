@@ -117,7 +117,7 @@ class ToolCreateOrEditFiles implements Tool {
     if (files.isEmpty()) {
       return new McpSchema.CallToolResult("The 'files' list must not be empty.", true);
     }
-    String commitMessage = getRequiredArgument(request, "commitMessage").toString();
+    String commitMessage = getRequiredArgument(request, "commitMessage", "Change by MCP server");
 
     try (RepositoryService repositoryService = repositoryServiceFactory.create(new NamespaceAndName(namespace, name))) {
       RepositoryPermissions.push(repositoryService.getRepository()).check();
