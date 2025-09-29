@@ -1,7 +1,7 @@
 {
     "name": "@scm-manager/scm-mcp-plugin",
     "private": true,
-    "version": "1.0.1",
+    "version": "1.0.2-SNAPSHOT",
     "license": "AGPL-3.0-only",
     "main": "./src/main/js/index.tsx",
     "scripts": {
