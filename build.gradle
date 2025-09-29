@@ -27,8 +27,8 @@ dependencies {
 }
 
 scmPlugin {
-  scmVersion = "3.10.3-SNAPSHOT"
-  displayName = "mcp"
+  scmVersion = "3.11.0"
+  displayName = "MCP"
   description = "Simple MCP Server for SCM-Manager"
   avatarUrl = '/images/mcp-logo.png'
 
