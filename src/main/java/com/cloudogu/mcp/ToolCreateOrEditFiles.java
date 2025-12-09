@@ -16,9 +16,14 @@
 
 package com.cloudogu.mcp;
 
-import io.modelcontextprotocol.server.McpSyncServerExchange;
-import io.modelcontextprotocol.spec.McpSchema;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthorizedException;
 import sonia.scm.NotFoundException;
 import sonia.scm.plugin.Extension;
@@ -32,53 +37,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
-import java.util.function.BiFunction;
 
+@Slf4j
 @Extension
-class ToolCreateOrEditFiles implements Tool {
-
-  private static final String SCHEMA = """
-    {
-      "type" : "object",
-      "id" : "tools/create-or-edit-files",
-      "properties" : {
-        "namespace" : {
-          "type" : "string",
-          "description": "The namespace for the new repository"
-        },
-        "name" : {
-          "type" : "string",
-          "description": "The name for the new repository",
-          "pattern": "(?!^\\\\\\\\.\\\\\\\\.$)(?!^\\\\\\\\.$)(?!.*[\\\\\\\\\\\\\\\\\\\\\\\\[\\\\\\\\]])(?!.*[.]git$)^[A-Za-z0-9\\\\\\\\.][A-Za-z0-9\\\\\\\\.\\\\\\\\-_]*$"
-        },
-        "files": {
-          "type": "array",
-          "description": "A list of files to create or edit.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "The path for the file that needs to be created or edited."
-              },
-              "content": {
-                "type": "string",
-                "description": "The content for the file."
-              }
-            },
-            "required": ["path", "content"]
-          }
-        },
-        "commitMessage": {
-          "type" : "string",
-          "description": "Commit message for the change",
-          "default": "Change by MCP server"
-        }
-      },
-      "required": ["namespace", "name", "files", "commitMessage"]
-    }
-    """;
+class ToolCreateOrEditFiles implements TypedTool<CreateOrEditFilesInput> {
 
   private final RepositoryServiceFactory repositoryServiceFactory;
 
@@ -89,7 +51,7 @@ class ToolCreateOrEditFiles implements Tool {
 
   @Override
   public String getName() {
-    return "create_or_edit_files";
+    return "create-or-edit-files";
   }
 
   @Override
@@ -98,61 +60,75 @@ class ToolCreateOrEditFiles implements Tool {
   }
 
   @Override
-  public String getInputSchema() {
-    return SCHEMA;
+  public Class<CreateOrEditFilesInput> getInputClass() {
+    return CreateOrEditFilesInput.class;
   }
 
   @Override
-  public BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> getCallHandler() {
-    return this::createOrEditFile;
-  }
-
-  private McpSchema.CallToolResult createOrEditFile(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
-    String namespace = getRequiredArgument(request, "namespace").toString();
-    String name = getRequiredArgument(request, "name").toString();
-    Object filesObj = getRequiredArgument(request, "files");
-    if (!(filesObj instanceof List<?> files)) {
-      return new McpSchema.CallToolResult("The 'files' argument must be a list.", true);
-    }
-    if (files.isEmpty()) {
-      return new McpSchema.CallToolResult("The 'files' list must not be empty.", true);
-    }
-    String commitMessage = getRequiredArgument(request, "commitMessage", "Change by MCP server");
-
-    try (RepositoryService repositoryService = repositoryServiceFactory.create(new NamespaceAndName(namespace, name))) {
+  public ToolResult execute(CreateOrEditFilesInput input) {
+    log.trace("executing request {}", input);
+    try (RepositoryService repositoryService = repositoryServiceFactory.create(new NamespaceAndName(input.getNamespace(), input.getName()))) {
       RepositoryPermissions.push(repositoryService.getRepository()).check();
       ModifyCommandBuilder modifyCommandBuilder = repositoryService.getModifyCommand()
-        .setCommitMessage(commitMessage);
-      for (Object fileObj : files) {
-        if (!(fileObj instanceof Map<?, ?> file)) {
-          return new McpSchema.CallToolResult("Each item in the 'files' list must be an object.", true);
-        }
-        if (!file.containsKey("path") || !file.containsKey("content")) {
-          return new McpSchema.CallToolResult("Each file object must contain 'path' and 'content' properties.", true);
-        }
-        String path = file.get("path").toString();
-        String content = file.get("content").toString();
+        .setCommitMessage(input.getCommitMessage());
+      for (FileEntry file : input.getFiles()) {
         modifyCommandBuilder
-          .createFile(path)
+          .createFile(file.getPath())
           .setOverwrite(true)
-          .withData(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
+          .withData(new ByteArrayInputStream(file.getContent().getBytes(StandardCharsets.UTF_8)));
       }
       modifyCommandBuilder
         .execute();
     } catch (NotFoundException e) {
-      return new McpSchema.CallToolResult(
-        String.format("The requested repository %s/%s was not found", namespace, name),
-        true
+      log.trace("requested repository not found");
+      return ToolResult.error(
+        String.format("The requested repository %s/%s was not found", input.getNamespace(), input.getName())
       );
     } catch (IOException e) {
-      return new McpSchema.CallToolResult(
-        "Something went wrong reading or writing the files",
-        true
+      log.debug("got exception while executing request", e);
+      return ToolResult.error(
+        "Something went wrong reading or writing the files"
       );
     } catch (UnauthorizedException e) {
-      return new McpSchema.CallToolResult("User is not authorized to use this resource", true);
+      log.trace("requested repository not authorized");
+      return ToolResult.error("User is not authorized to use this resource");
     }
 
-    return new McpSchema.CallToolResult("The files have been successfully created / edited",false);
+    log.trace("files created");
+    return ToolResult.ok("The files have been successfully created / edited");
   }
+}
+
+@Getter
+@ToString(exclude = "commitMessage")
+class CreateOrEditFilesInput {
+  @NotNull
+  @JsonPropertyDescription("The namespace for the new repository")
+  private String namespace;
+
+  @NotNull
+  @JsonPropertyDescription("The name for the new repository")
+  @Pattern(regexp = Validations.REPOSITORY_NAME_REGEX)
+  private String name;
+
+  @NotNull
+  @JsonPropertyDescription("A list of files to create or edit.")
+  @Valid // Important: This tells the validator to validate the objects INSIDE the list
+  private List<FileEntry> files;
+
+  @NotNull
+  @JsonPropertyDescription("Commit message for the change")
+  private String commitMessage = "Change by MCP server";
+}
+
+@Getter
+@ToString(exclude = "content")
+class FileEntry {
+  @NotNull
+  @JsonPropertyDescription("The path for the file that needs to be created or edited.")
+  private String path;
+
+  @NotNull
+  @JsonPropertyDescription("The content for the file.")
+  private String content;
 }

@@ -16,9 +16,15 @@
 
 package com.cloudogu.mcp;
 
-import io.modelcontextprotocol.server.McpSyncServerExchange;
-import io.modelcontextprotocol.spec.McpSchema;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import sonia.scm.AlreadyExistsException;
 import sonia.scm.config.ScmConfiguration;
 import sonia.scm.plugin.Extension;
@@ -30,72 +36,30 @@ import sonia.scm.web.api.RepositoryToHalMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
 
+@Slf4j
 @Extension
-class ToolCreateRepository implements Tool {
-
-  private static final String SCHEMA_WITH_NAMESPACES = """
-    {
-      "type" : "object",
-      "id" : "tools/create-repository",
-      "properties" : {
-        "namespace" : {
-          "type" : "string",
-          "description": "The namespace for the new repository"
-        },
-        "name" : {
-          "type" : "string",
-          "description": "The name for the new repository",
-          "pattern": "(?!^\\\\.\\\\.$)(?!^\\\\.$)(?!.*[\\\\\\\\\\\\[\\\\]])(?!.*[.]git$)^[A-Za-z0-9\\\\.][A-Za-z0-9\\\\.\\\\-_]*$"
-        },
-        "type" : {
-          "type" : "string",
-          "description": "The type of the new repository. This must be either 'git', 'hg', or 'svn'",
-          "enum": ["git", "hg", "svn"],
-          "default": "git"
-        }
-      },
-      "required": ["namespace", "name"]
-    }
-    """;
-  private static final String SCHEMA_WITHOUT_NAMESPACES = """
-    {
-      "type" : "object",
-      "id" : "tools/create-repository",
-      "properties" : {
-        "name" : {
-          "type" : "string",
-          "description": "The name for the new repository",
-          "pattern": "(?!^\\\\.\\\\.$)(?!^\\\\.$)(?!.*[\\\\\\\\\\\\[\\\\]])(?!.*[.]git$)^[A-Za-z0-9\\\\.][A-Za-z0-9\\\\.\\\\-_]*$"
-        },
-        "type" : {
-          "type" : "string",
-          "description": "The type of the new repository. This must be either 'git', 'hg', or 'svn'",
-          "enum": ["git", "hg", "svn"],
-          "default": "git"
-        }
-      },
-      "required": ["name"]
-    }
-    """;
+class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
 
   private final RepositoryManager repositoryManager;
   private final RepositoryToHalMapper repositoryToHalMapper;
-  private final ScmConfiguration scmConfiguration;
-  private final Set<NamespaceStrategy> strategies;
+  private final boolean canSetNamespace;
 
   @Inject
   public ToolCreateRepository(RepositoryManager repositoryManager, RepositoryToHalMapper repositoryToHalMapper, ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies) {
+    this(repositoryManager, repositoryToHalMapper, isRenameNamespacePossible(scmConfiguration, strategies));
+  }
+
+  @VisibleForTesting
+  ToolCreateRepository(RepositoryManager repositoryManager, RepositoryToHalMapper repositoryToHalMapper, boolean canSetNamespace) {
     this.repositoryManager = repositoryManager;
     this.repositoryToHalMapper = repositoryToHalMapper;
-    this.scmConfiguration = scmConfiguration;
-    this.strategies = strategies;
+    this.canSetNamespace = canSetNamespace;
   }
 
   @Override
   public String getName() {
-    return "create_repository";
+    return "create-repository";
   }
 
   @Override
@@ -104,37 +68,39 @@ class ToolCreateRepository implements Tool {
   }
 
   @Override
-  public String getInputSchema() {
-    return isRenameNamespacePossible() ?
-      SCHEMA_WITH_NAMESPACES :
-      SCHEMA_WITHOUT_NAMESPACES;
+  public Class<? extends CreateRepositoryInput> getInputClass() {
+    return canSetNamespace ?
+      CreateRepositoryInputWithNamespace.class :
+      CreateRepositoryInputWithoutNamespace.class;
   }
 
   @Override
-  public BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> getCallHandler() {
-    return (exchange, request) -> {
-      String namespace = request.arguments().get("namespace") == null ? null : request.arguments().get("namespace").toString();
-      String name = getRequiredArgument(request, "name").toString();
-      String type = getRequiredArgument(request, "type", "git");
+  public ToolResult execute(CreateRepositoryInput input) {
+    log.trace("executing request {}", input);
+    try {
+      Repository repository = repositoryManager.create(
+        new Repository(
+          null,
+          input.getType().name(),
+          input.getNamespace(),
+          input.getName())
+      );
 
-      try {
-        Repository repository = repositoryManager.create(new Repository(null, type, namespace, name));
+      log.trace("created new repository {}", repository);
 
-        return new McpSchema.CallToolResult(
-          List.of(new McpSchema.TextContent(repository.getNamespaceAndName().toString())),
-          false,
-          Map.of("repository", repositoryToHalMapper.map(repository))
-        );
-      } catch (AlreadyExistsException existsException) {
-        return new McpSchema.CallToolResult(
-          "A repository with this namespace and name already exists",
-          true
-        );
-      }
-    };
+      return ToolResult.ok(
+        List.of(repository.getNamespaceAndName().toString()),
+        Map.of("repository", repositoryToHalMapper.map(repository))
+      );
+    } catch (AlreadyExistsException existsException) {
+      log.trace("repository already exists", existsException);
+      return ToolResult.error(
+        "A repository with this namespace and name already exists"
+      );
+    }
   }
 
-  private boolean isRenameNamespacePossible() {
+  private static boolean isRenameNamespacePossible(ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies) {
     for (NamespaceStrategy strategy : strategies) {
       if (strategy.getClass().getSimpleName().equals(scmConfiguration.getNamespaceStrategy())) {
         return strategy.canBeChanged();
@@ -142,4 +108,51 @@ class ToolCreateRepository implements Tool {
     }
     return false;
   }
+
+}
+
+interface CreateRepositoryInput {
+  String getNamespace();
+
+  String getName();
+
+  RepoType getType();
+}
+
+@Getter
+@ToString(callSuper = true)
+class CreateRepositoryInputWithNamespace extends CreateRepositoryInputWithoutNamespace {
+  @NotNull // Marks this field as required in the schema
+  @JsonPropertyDescription("The namespace for the new repository")
+  private String namespace;
+}
+
+@Getter
+@ToString
+class CreateRepositoryInputWithoutNamespace implements CreateRepositoryInput {
+
+  @NotNull
+  @JsonPropertyDescription("The name for the new repository")
+  @Pattern(regexp = Validations.REPOSITORY_NAME_REGEX)
+  private String name;
+
+  @JsonPropertyDescription("The type of the new repository. This must be either 'git', 'hg', or 'svn'")
+  private RepoType type = RepoType.git; // Default value in Java
+
+  @JsonPropertyDescription("Optional description for the repository")
+  private String description;
+
+  @Email
+  @JsonPropertyDescription("Optional contact in form of an email address")
+  private String contact;
+
+  @Override
+  public String getNamespace() {
+    return null;
+  }
+}
+
+@SuppressWarnings("java:S115") // we want lower caps here so that the enum can be used directly by the AI
+enum RepoType {
+  git, hg, svn
 }

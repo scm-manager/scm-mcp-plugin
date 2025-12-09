@@ -20,28 +20,30 @@ import io.modelcontextprotocol.server.McpSyncServerExchange;
 import io.modelcontextprotocol.spec.McpSchema;
 import sonia.scm.plugin.ExtensionPoint;
 
-import java.util.function.BiFunction;
-
+/**
+ * An implementation for an MCP tool. Normally, use {@link TypedTool} instead for convenience.
+ */
 @ExtensionPoint
 public interface Tool {
 
+  /**
+   * The name of the tool. This has to be a string without spaces.
+   */
   String getName();
 
+  /**
+   * The description of the tool that should be used by the AI.
+   */
   String getDescription();
 
+  /**
+   * The core function for this tool that will be executed on each call creating a result that will be returned to the
+   * AI.
+   */
+  McpSchema.CallToolResult execute(McpSyncServerExchange exchange, McpSchema.CallToolRequest request);
+
+  /**
+   * The JSON schema for this tool.
+   */
   String getInputSchema();
-
-  BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> getCallHandler();
-
-  default Object getRequiredArgument(McpSchema.CallToolRequest request, String argumentName) {
-    if (!request.arguments().containsKey(argumentName)) {
-      throw new IllegalArgumentException(String.format("The required argument '%s' is missing.", argumentName));
-    }
-    return request.arguments().get(argumentName);
-  }
-
-  @SuppressWarnings("unchecked")
-  default <T> T getRequiredArgument(McpSchema.CallToolRequest request, String argumentName, T defaultValue) {
-    return (T) request.arguments().getOrDefault(argumentName, defaultValue);
-  }
 }

@@ -16,9 +16,8 @@
 
 package com.cloudogu.mcp;
 
-import io.modelcontextprotocol.server.McpSyncServerExchange;
-import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
 import sonia.scm.plugin.Extension;
 import sonia.scm.repository.Repository;
 import sonia.scm.repository.RepositoryManager;
@@ -29,17 +28,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
 
+@Slf4j
 @Extension
-class ToolGetRepositories implements Tool {
-
-  private static final String SCHEMA = """
-    {
-      "type": "object",
-      "id" : "tools/list-all-repositories"
-    }
-    """;
+class ToolGetRepositories implements TypedTool<ListRepositoriesInput> {
 
   private final RepositoryManager repositoryManager;
   private final RepositoryToHalMapper repositoryToHalMapper;
@@ -52,7 +44,7 @@ class ToolGetRepositories implements Tool {
 
   @Override
   public String getName() {
-    return "list_repositories";
+    return "list-all-repositories";
   }
 
   @Override
@@ -61,26 +53,30 @@ class ToolGetRepositories implements Tool {
   }
 
   @Override
-  public String getInputSchema() {
-    return SCHEMA;
+  public Class<ListRepositoriesInput> getInputClass() {
+    return ListRepositoriesInput.class;
   }
 
   @Override
-  public BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> getCallHandler() {
-    return (exchange, request) -> {
-      Collection<Repository> repositories = repositoryManager.getAll();
-      Map<String, Object> structuredContent = new HashMap<>(repositories.size());
-      List<McpSchema.Content> repositoryNames = new ArrayList<>(repositories.size());
+  public ToolResult execute(ListRepositoriesInput input) {
+    log.trace("executing request");
+    Collection<Repository> repositories = repositoryManager.getAll();
+    Map<String, Object> structuredContent = new HashMap<>(repositories.size());
+    List<String> repositoryNames = new ArrayList<>(repositories.size());
 
-      for (Repository repository : repositories) {
-        structuredContent.put(
-          repository.getNamespaceAndName().toString(),
-          repositoryToHalMapper.map(repository)
-        );
-        repositoryNames.add(new McpSchema.TextContent(repository.getNamespaceAndName().toString()));
-      }
+    for (Repository repository : repositories) {
+      structuredContent.put(
+        repository.getNamespaceAndName().toString(),
+        repositoryToHalMapper.map(repository)
+      );
+      repositoryNames.add(repository.getNamespaceAndName().toString());
+    }
 
-      return new McpSchema.CallToolResult(repositoryNames, false, structuredContent);
-    };
+    log.trace("found {} repositories", repositories.size());
+    return ToolResult.ok(repositoryNames, structuredContent);
   }
+}
+
+class ListRepositoriesInput {
+  // Intentionally empty
 }
