@@ -18,6 +18,7 @@ package com.cloudogu.mcp;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.annotations.VisibleForTesting;
+import de.otto.edison.hal.Link;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
@@ -31,7 +32,9 @@ import sonia.scm.plugin.Extension;
 import sonia.scm.repository.NamespaceStrategy;
 import sonia.scm.repository.Repository;
 import sonia.scm.repository.RepositoryManager;
-import sonia.scm.web.api.RepositoryToHalMapper;
+import sonia.scm.repository.api.RepositoryService;
+import sonia.scm.repository.api.RepositoryServiceFactory;
+import sonia.scm.repository.api.ScmProtocol;
 
 import java.util.List;
 import java.util.Map;
@@ -42,19 +45,21 @@ import java.util.Set;
 class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
 
   private final RepositoryManager repositoryManager;
-  private final RepositoryToHalMapper repositoryToHalMapper;
+  private final RepositoryMapper repositoryMapper;
   private final boolean canSetNamespace;
+  private final RepositoryServiceFactory repositoryServiceFactory;
 
   @Inject
-  public ToolCreateRepository(RepositoryManager repositoryManager, RepositoryToHalMapper repositoryToHalMapper, ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies) {
-    this(repositoryManager, repositoryToHalMapper, isRenameNamespacePossible(scmConfiguration, strategies));
+  public ToolCreateRepository(RepositoryManager repositoryManager, RepositoryMapper repositoryMapper, ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies, RepositoryServiceFactory repositoryServiceFactory) {
+    this(repositoryManager, repositoryMapper, isRenameNamespacePossible(scmConfiguration, strategies), repositoryServiceFactory);
   }
 
   @VisibleForTesting
-  ToolCreateRepository(RepositoryManager repositoryManager, RepositoryToHalMapper repositoryToHalMapper, boolean canSetNamespace) {
+  ToolCreateRepository(RepositoryManager repositoryManager, RepositoryMapper repositoryMapper, boolean canSetNamespace, RepositoryServiceFactory repositoryServiceFactory) {
     this.repositoryManager = repositoryManager;
-    this.repositoryToHalMapper = repositoryToHalMapper;
+    this.repositoryMapper = repositoryMapper;
     this.canSetNamespace = canSetNamespace;
+    this.repositoryServiceFactory = repositoryServiceFactory;
   }
 
   @Override
@@ -83,14 +88,26 @@ class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
           null,
           input.getType().name(),
           input.getNamespace(),
-          input.getName())
+          input.getName(),
+          input.getContact(),
+          input.getDescription()
+        )
       );
 
       log.trace("created new repository {}", repository);
 
+      McpRepositoryDto dto = repositoryMapper.toDto(repository);
+      try (RepositoryService repositoryService = repositoryServiceFactory.create(repository)) {
+        dto.setProtocolLinks(
+          repositoryService.getSupportedProtocols()
+            .map(this::createProtocolLink)
+            .toList()
+        );
+      }
+
       return ToolResult.ok(
         List.of(repository.getNamespaceAndName().toString()),
-        Map.of("repository", repositoryToHalMapper.map(repository))
+        Map.of("repository", dto)
       );
     } catch (AlreadyExistsException existsException) {
       log.trace("repository already exists", existsException);
@@ -98,6 +115,10 @@ class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
         "A repository with this namespace and name already exists"
       );
     }
+  }
+
+  private Link createProtocolLink(ScmProtocol protocol) {
+    return Link.link(protocol.getType(), protocol.getUrl());
   }
 
   private static boolean isRenameNamespacePossible(ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies) {
@@ -117,6 +138,10 @@ interface CreateRepositoryInput {
   String getName();
 
   RepoType getType();
+
+  String getDescription();
+
+  String getContact();
 }
 
 @Getter

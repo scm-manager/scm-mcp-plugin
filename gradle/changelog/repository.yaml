@@ -1,0 +1,4 @@
+- type: changed
+  description: Simplified result object for repositories without HAL links
+- type: changed
+  description: Details for repositories are optional

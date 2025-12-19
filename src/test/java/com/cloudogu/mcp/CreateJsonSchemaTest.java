@@ -29,6 +29,22 @@ class CreateJsonSchemaTest {
     {
       "$schema" : "https://json-schema.org/draft/2020-12/schema",
       "type" : "object",
+      "properties" : {
+        "details" : {
+          "type" : "boolean",
+          "description" : "If set to `true`, details for the repositories will be sent as structured data. If `false`, only the list of namespaces and names will be returned.",
+          "default" : false
+        },
+        "namespace" : {
+          "type" : "string",
+          "description" : "If set, list only the repositories from this namespace."
+        },
+        "type" : {
+          "type" : "string",
+          "enum" : [ "git", "svn", "hg" ],
+          "description" : "If set, list only the repositories with this type."
+        }
+      },
       "id" : "tools/list-all-repositories"
     }""";
 
@@ -179,11 +195,11 @@ class CreateJsonSchemaTest {
 
   static Stream<Arguments> provideClassesAndStrings() {
     return Stream.of(
-      Arguments.of(new ToolGetRepositories(null, null), GET_REPOSITORIES_SCHEMA),
+      Arguments.of(new ToolGetRepositories(null, null, null), GET_REPOSITORIES_SCHEMA),
       Arguments.of(new ToolCreateOrEditFiles(null), CREATE_OR_EDIT_FILES_SCHEMA),
       Arguments.of(new ToolSearchGlobally(null), SEARCH_GLOBALLY_SCHEMA),
-      Arguments.of(new ToolCreateRepository(null, null, false), CREATE_REPOSITORY_SCHEMA_WITHOUT_NAMESPACES),
-      Arguments.of(new ToolCreateRepository(null, null, true), CREATE_REPOSITORY_SCHEMA_WITH_NAMESPACES)
+      Arguments.of(new ToolCreateRepository(null, null, false, null), CREATE_REPOSITORY_SCHEMA_WITHOUT_NAMESPACES),
+      Arguments.of(new ToolCreateRepository(null, null, true, null), CREATE_REPOSITORY_SCHEMA_WITH_NAMESPACES)
     );
   }
 }

@@ -16,12 +16,19 @@
 
 package com.cloudogu.mcp;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Strings;
+import de.otto.edison.hal.Link;
 import jakarta.inject.Inject;
+import lombok.Getter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import sonia.scm.plugin.Extension;
 import sonia.scm.repository.Repository;
 import sonia.scm.repository.RepositoryManager;
-import sonia.scm.web.api.RepositoryToHalMapper;
+import sonia.scm.repository.api.RepositoryService;
+import sonia.scm.repository.api.RepositoryServiceFactory;
+import sonia.scm.repository.api.ScmProtocol;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,12 +41,14 @@ import java.util.Map;
 class ToolGetRepositories implements TypedTool<ListRepositoriesInput> {
 
   private final RepositoryManager repositoryManager;
-  private final RepositoryToHalMapper repositoryToHalMapper;
+  private final RepositoryMapper repositoryMapper;
+  private final RepositoryServiceFactory repositoryServiceFactory;
 
   @Inject
-  public ToolGetRepositories(RepositoryManager repositoryManager, RepositoryToHalMapper repositoryToHalMapper) {
+  public ToolGetRepositories(RepositoryManager repositoryManager, RepositoryMapper repositoryMapper, RepositoryServiceFactory repositoryServiceFactory) {
     this.repositoryManager = repositoryManager;
-    this.repositoryToHalMapper = repositoryToHalMapper;
+    this.repositoryMapper = repositoryMapper;
+    this.repositoryServiceFactory = repositoryServiceFactory;
   }
 
   @Override
@@ -65,18 +74,49 @@ class ToolGetRepositories implements TypedTool<ListRepositoriesInput> {
     List<String> repositoryNames = new ArrayList<>(repositories.size());
 
     for (Repository repository : repositories) {
+      if (!Strings.isNullOrEmpty(input.getNamespace()) && !input.getNamespace().equals(repository.getNamespace())) {
+        continue;
+      }
+      if (input.getType() != null && !input.getType().name().equals(repository.getType())) {
+        continue;
+      }
+      McpRepositoryDto dto = repositoryMapper.toDto(repository);
+      try (RepositoryService repositoryService = repositoryServiceFactory.create(repository)) {
+        dto.setProtocolLinks(
+          repositoryService.getSupportedProtocols()
+            .map(this::createProtocolLink)
+            .toList()
+        );
+      }
       structuredContent.put(
         repository.getNamespaceAndName().toString(),
-        repositoryToHalMapper.map(repository)
+        dto
       );
       repositoryNames.add(repository.getNamespaceAndName().toString());
     }
 
     log.trace("found {} repositories", repositories.size());
-    return ToolResult.ok(repositoryNames, structuredContent);
+    return ToolResult.ok(repositoryNames, input.isDetails() ? structuredContent : null);
+  }
+
+  private Link createProtocolLink(ScmProtocol protocol) {
+    return Link.link(protocol.getType(), protocol.getUrl());
   }
 }
 
+@Getter
+@ToString
 class ListRepositoriesInput {
-  // Intentionally empty
+  @JsonPropertyDescription("If set, list only the repositories from this namespace.")
+  private String namespace;
+  @JsonPropertyDescription("If set, list only the repositories with this type.")
+  private RepositoryType type;
+  @JsonPropertyDescription("If set to `true`, details for the repositories will be sent as structured data. If `false`, only the list of namespaces and names will be returned.")
+  private boolean details;
+
+  enum RepositoryType {
+    git,
+    svn,
+    hg
+  }
 }
