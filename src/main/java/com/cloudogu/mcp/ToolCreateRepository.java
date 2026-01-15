@@ -22,14 +22,18 @@ import jakarta.inject.Inject;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.SecurityUtils;
 import sonia.scm.config.ScmConfiguration;
 import sonia.scm.plugin.Extension;
 import sonia.scm.repository.NamespaceStrategy;
 import sonia.scm.repository.Repository;
 import sonia.scm.repository.RepositoryManager;
+import sonia.scm.repository.RepositoryPermission;
 import sonia.scm.repository.api.RepositoryService;
 import sonia.scm.repository.api.RepositoryServiceFactory;
 import sonia.scm.repository.api.ScmProtocol;
@@ -39,6 +43,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.cloudogu.mcp.OkResultRenderer.success;
+import static java.util.Collections.singletonList;
 
 @Slf4j
 @Extension
@@ -82,24 +87,26 @@ class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
   @Override
   public ToolResult execute(CreateRepositoryInput input) {
     log.trace("executing request {}", input);
-    Repository repository = repositoryManager.create(
-      new Repository(
-        null,
-        input.getType().name(),
-        input.getNamespace(),
-        input.getName(),
-        input.getContact(),
-        input.getDescription()
-      )
+    Repository newRepository = new Repository(
+      null,
+      input.getType().name(),
+      input.getNamespace(),
+      input.getName(),
+      input.getContact(),
+      input.getDescription()
     );
+    newRepository.setPermissions(singletonList(
+      new RepositoryPermission(SecurityUtils.getSubject().getPrincipal().toString(), "OWNER", false)
+    ));
+    Repository createdRepository = repositoryManager.create(newRepository);
 
-    log.trace("created new repository {}", repository);
+    log.trace("created new repository {}", createdRepository);
 
-    McpRepositoryDto dto = repositoryMapper.toDto(repository);
-    Map<String, String> protocolLinks = getProtocolLinks(repository);
+    McpRepositoryDto dto = repositoryMapper.toDto(createdRepository);
+    Map<String, String> protocolLinks = getProtocolLinks(createdRepository);
     dto.setProtocolLinks(protocolLinks);
 
-    return success(String.format("The repository '%s' has been created successfully.", repository.getNamespaceAndName()))
+    return success(String.format("The repository '%s' has been created successfully.", createdRepository.getNamespaceAndName()))
       .withInfoText("The repository can be viewed or cloned using the url " + protocolLinks.get("http"))
       .render(Map.of("repository", dto));
   }
@@ -138,6 +145,7 @@ interface CreateRepositoryInput {
 }
 
 @Getter
+@Setter(AccessLevel.PACKAGE)
 @ToString(callSuper = true)
 class CreateRepositoryInputWithNamespace extends CreateRepositoryInputWithoutNamespace {
   @NotEmpty
@@ -147,6 +155,7 @@ class CreateRepositoryInputWithNamespace extends CreateRepositoryInputWithoutNam
 }
 
 @Getter
+@Setter(AccessLevel.PACKAGE)
 @ToString
 class CreateRepositoryInputWithoutNamespace implements CreateRepositoryInput {
 
