@@ -16,34 +16,38 @@
 
 package com.cloudogu.mcp;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import sonia.scm.plugin.Extension;
 import sonia.scm.search.Hit;
-import sonia.scm.search.QueryBuilder;
 import sonia.scm.search.SearchEngine;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Extension
 @SuppressWarnings("UnstableApiUsage")
-public class ToolSearchGlobally implements TypedTool<SearchInput> {
+class ToolSearchGlobally implements TypedTool<SearchInput> {
 
   private final SearchEngine searchEngine;
+  private final Set<ToolSearchExtension> searchExtensions;
 
   @Inject
-  public ToolSearchGlobally(SearchEngine searchEngine) {
+  public ToolSearchGlobally(SearchEngine searchEngine, Set<ToolSearchExtension> searchExtensions) {
     this.searchEngine = searchEngine;
+    this.searchExtensions = searchExtensions;
   }
 
   @Override
@@ -56,32 +60,31 @@ public class ToolSearchGlobally implements TypedTool<SearchInput> {
     return """
       Search the SCM-Manager for content globally.
       This search currently allows searching for the following types.
-      1. Repositories (corresponding type is repository)
-      2. File content within repositories (corresponding type is content)
+      These query types only have to be set in the search input. This **must not** be part of the query string itself!
+      """ +
+      searchExtensions.stream()
+        .map(ToolSearchExtension::getSummary)
+        .map(s -> "- " + s)
+        .collect(Collectors.joining("\n")) +
+      """
       
-      Each type supports different fields that can be searched.
-      1. Fields of repository type
-        1.1 namespace - The namespace of the repository
-        1.2 name - The name of the repository
-        1.3 type - The type of the repository (git, hg or svn)
-        1.4 description - The description of the repository
-        1.5 creationDate - The creation date of the repository as unix epoch timestamp
-        1.6 lastModified - The last time the repository was modified as a unix epoch timestamp
-      2. Fields of content type
-        2.1 path - Path of the file within the repository
-        2.2 filename - Name of the file including the extension within the repository
-        2.3 extension - Name of the file extension within the repository
-        2.4 content - Content of the file within the repository
-      
-      If you want to search for a value within a specific field, then you have to combine the field name and the value you are searching for with a colon (:) seperating them.
-      For example if you want to search for a file that contains the word react, then the query would look like this 'content:react'.
-      
-      If you dont want to search within a specific field then you only need to add the value you are searching for.
-      For example if you want to search for the term react within all fields, then the query would look like this 'react'.
-      
+      Each type supports different fields that can be searched:
+
+      """ +
+      searchExtensions.stream()
+        .map(ToolSearchExtension::getDescription)
+        .collect(Collectors.joining("\n")) +
+      """
+
+      If you want to search for a value within a specific field, then you have to combine the field name and the value you are searching for with a colon (`:`) seperating them.
+      For example if you want to search for a file that contains the word "react", then the query would look like this `content:react`.
+    
+      If you dont want to search within a specific field, then you only need to add the value you are searching for.
+      For example if you want to search for the term "react" within all fields, then the query would look like this `react`.
+    
       You can also combine search terms logically with the AND and OR operators.
-      For example if you want to search for a Java file that contains the term 'static void main', then the query would look like this 'extension:java AND content:"static void main".
-      As you can see if you want to combine multiple words into one term, then you need to surround them with double quotes (").
+      For example if you want to search for a Java file that contains the term "static void main", then the query would look like this `extension:java AND content:"static void main"`.
+      As you can see, if you want to combine multiple words into one term, then you need to surround them with double quotes (`"`).
       """;
   }
 
@@ -93,76 +96,79 @@ public class ToolSearchGlobally implements TypedTool<SearchInput> {
   @Override
   public ToolResult execute(SearchInput searchInput) {
     log.trace("executing request {}", searchInput);
-    QueryBuilder<Object> queryBuilder = searchEngine.forType(searchInput.getType().name())
+
+    return searchExtensions.stream()
+      .filter(e -> searchInput.getType().equals(e.getSearchType()))
+      .findFirst()
+      .map(extension -> runSearchWithExtension(searchInput, extension))
+      .orElse(
+        ToolResult.error(
+          String.format("The search type '%s' does not exist; please choose one of '%s'",
+            searchInput.getType(),
+            searchExtensions.stream().map(ToolSearchExtension::getSearchType).collect(Collectors.joining("', '"))
+          )
+        )
+      );
+  }
+
+  private ToolResult runSearchWithExtension(SearchInput searchInput, ToolSearchExtension extension) {
+    List<Hit> hits = searchEngine.forType(searchInput.getType())
       .search()
       .start(searchInput.getPage() * searchInput.getPageSize())
-      .limit(searchInput.getPageSize());
+      .limit(searchInput.getPageSize())
+      .execute(searchInput.getQuery()).getHits();
 
-    List<Hit> hits = queryBuilder.execute(searchInput.getQuery()).getHits();
-    List<String> unstructuredResults = new ArrayList<>(hits.size());
     Map<String, Object> structuredResults = new HashMap<>(hits.size());
+    if (hits.isEmpty()) {
+      log.trace("found {} hit(s)", hits.size());
+      return OkResultRenderer.ok("EMPTY", "Nothing found for the query.").render();
+    } else {
+      return handleHits(extension, hits, structuredResults);
+    }
+  }
 
+  private ToolResult handleHits(ToolSearchExtension extension, List<Hit> hits, Map<String, Object> structuredResults) {
+    OkResultRenderer resultRenderer = OkResultRenderer.success(String.format("Found %d hits", hits.size()));
+    resultRenderer.withInfoText("More details may be found in the structured result using the hit number as the key.");
+
+    renderTableHeader(extension, resultRenderer);
+
+    int hitNr = 0;
     for (Hit hit : hits) {
-      unstructuredResults.add(transformHitToUnstructuredAnswer(hit));
-      structuredResults.put(hit.getId(), transformHitToStructuredAnswer(hit));
+      ++hitNr;
+      resultRenderer.append(hitNr).append(" | ");
+      resultRenderer.appendLine(String.join(" | ", extension.transformHitToTableFields(hit)));
+      structuredResults.put(Integer.toString(hitNr), extension.transformHitToStructuredAnswer(hit));
     }
 
     log.trace("found {} hit(s)", hits.size());
-    return ToolResult.ok(unstructuredResults, structuredResults);
+    return resultRenderer.render(structuredResults);
   }
 
-  private Map<String, Object> transformHitToStructuredAnswer(Hit hit) {
-    Map<String, Object> transformedHit = new HashMap<>(3);
-    transformedHit.put("id", hit.getId());
-    hit.getRepositoryId().ifPresent(
-      repositoryId -> transformedHit.put("repositoryId", repositoryId)
-    );
-
-    Map<String, Object> transformedFields = new HashMap<>(hit.getFields().size());
-    hit.getFields().forEach(
-      (fieldName, field) -> transformedFields.put(fieldName, transformField(field))
-    );
-    transformedHit.put("fields", transformedFields);
-
-    return transformedHit;
-  }
-
-  private String transformHitToUnstructuredAnswer(Hit hit) {
-    StringBuilder answer = new StringBuilder();
-    answer.append(String.format("Search Result ID: %s\n", hit.getId()));
-    hit.getRepositoryId().ifPresent(
-      repositoryId -> answer.append(String.format("Repository ID: %s\n", repositoryId))
-    );
-    hit.getFields().forEach(
-      (fieldName, field) -> answer.append(String.format("Field Name: %s, Field Value: %s\n", fieldName, transformField(field)))
-    );
-
-    return answer.toString();
-  }
-
-  private String transformField(Hit.Field field) {
-    if (field instanceof Hit.ValueField valueField) {
-      return valueField.getValue().toString();
+  private static void renderTableHeader(ToolSearchExtension extension, OkResultRenderer resultRenderer) {
+    resultRenderer.append("Hit Nr. | ");
+    resultRenderer.appendLine(String.join(" | ", extension.tableColumnHeader()));
+    for (int i = 0; i < extension.tableColumnHeader().length; ++i) {
+      if (i > 0) {
+        resultRenderer.append("|");
+      }
+      resultRenderer.append("---");
     }
-
-    if (field instanceof Hit.HighlightedField highlightedField) {
-      return String.join("", highlightedField.getFragments());
-    }
-
-    throw new RuntimeException(String.format("Unsupported field type: %s", field.getClass()));
+    resultRenderer.append('\n');
   }
 }
 
 @Getter
+@Setter(AccessLevel.PACKAGE) // used for testing
 @ToString
 class SearchInput {
 
-  @NotNull
-  @JsonPropertyDescription("Query that is used to search for the results")
+  @NotEmpty
+  @JsonPropertyDescription("Query that is used to search for the results. Do not try to set the query type here, only use the terms that are searched for.")
   private String query;
 
   @Min(0)
-  @JsonPropertyDescription("Which page of the result should be shown")
+  @JsonPropertyDescription("Page of the result that should be returned.")
   private int page = 0;
 
   @Min(1)
@@ -171,12 +177,5 @@ class SearchInput {
 
   @NotNull
   @JsonPropertyDescription("The type of object the user is search for. For example 'repository'")
-  @JsonProperty(defaultValue = "repository")
-  private SearchType type = SearchType.repository;
-}
-
-@SuppressWarnings("java:S115") // we want lower caps here so that the enum can be used directly by the AI
-enum SearchType {
-  repository,
-  content
+  private String type = "repository";
 }

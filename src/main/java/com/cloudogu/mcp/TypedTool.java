@@ -16,6 +16,8 @@
 
 package com.cloudogu.mcp;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.victools.jsonschema.generator.CustomDefinition;
 import com.github.victools.jsonschema.generator.FieldScope;
 import com.github.victools.jsonschema.generator.OptionPreset;
 import com.github.victools.jsonschema.generator.SchemaGenerator;
@@ -29,9 +31,11 @@ import io.modelcontextprotocol.server.McpSyncServerExchange;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sonia.scm.plugin.ExtensionPoint;
 
 import java.lang.reflect.Constructor;
+import java.time.Instant;
+
+import static io.modelcontextprotocol.spec.McpSchema.CallToolResult.builder;
 
 /**
  * An implementation for an MCP tool. In contrast to {@link Tool}, this offers convenience methods for schema
@@ -51,23 +55,25 @@ public interface TypedTool<I> extends Tool {
 
   /**
    * Default implementation, parsing the input object using the request and calling
-   * {@link #execute( Object)} with this object.
+   * {@link #execute(Object)} with this object.
    */
   default McpSchema.CallToolResult execute(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
-    ToolResult result = execute(parse(request));
+    ToolResult result;
+    try {
+      result = execute(parse(request));
+    } catch (IllegalArgumentException e) {
+      return builder().addTextContent(e.getMessage()).isError(true).build();
+    }
     if (result.isError()) {
       LOGGER.trace("request failed: {}", result.getMessage());
-      return new McpSchema.CallToolResult(
-        result.getMessage(),
-        true
-      );
+      return builder().addTextContent(result.getMessage()).isError(true).build();
     } else {
       LOGGER.trace("request successful");
-      return new McpSchema.CallToolResult(
-        result.getContent().stream().map(McpSchema.TextContent::new).map(tc -> (McpSchema.Content) tc).toList(),
-        false,
-        result.getStructuredContent()
-      );
+      return builder()
+        .textContent(result.getContent())
+        .isError(false)
+        .structuredContent(result.getStructuredContent())
+        .build();
     }
   }
 
@@ -95,7 +101,7 @@ public interface TypedTool<I> extends Tool {
    * Default implementation creating the schema from {@link #getInputClass()}.
    */
   default String getInputSchema() {
-    var schemaNode = GENERATOR.generateSchema(getInputClass());
+    ObjectNode schemaNode = GENERATOR.generateSchema(getInputClass());
     schemaNode.put("id", "tools/" + getName());
     String schema = schemaNode.toPrettyString();
     LOGGER.trace("created json schema for class {}:\n{}", getInputClass(), schema);
@@ -117,7 +123,16 @@ public interface TypedTool<I> extends Tool {
       SchemaVersion.DRAFT_2020_12,
       OptionPreset.PLAIN_JSON
     );
-
+    configBuilder.forTypesInGeneral()
+      .withCustomDefinitionProvider((javaType, context) -> {
+        if (javaType.getErasedType() == Instant.class) {
+          ObjectNode node = context.getGeneratorConfig().createObjectNode();
+          node.put("type", "string");
+          node.put("format", "date-time");
+          return new CustomDefinition(node, true);
+        }
+        return null;
+      });
     configBuilder.with(jacksonModule);
     configBuilder.with(jakartaModule);
 

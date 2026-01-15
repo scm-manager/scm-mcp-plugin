@@ -16,11 +16,14 @@
 
 package com.cloudogu.mcp;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,7 +33,14 @@ class ToolInputParser {
   private final ObjectMapper objectMapper;
   private final Validator validator;
 
-  static final ToolInputParser INSTANCE = new ToolInputParser(new ObjectMapper());
+  static final ToolInputParser INSTANCE = new ToolInputParser(createObjectMapper());
+
+  private static ObjectMapper createObjectMapper() {
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.registerModule(new JavaTimeModule());
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    return mapper;
+  }
 
   ToolInputParser(ObjectMapper objectMapper) {
     this.objectMapper = objectMapper;

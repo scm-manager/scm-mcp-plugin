@@ -17,8 +17,8 @@
 package com.cloudogu.mcp;
 
 import org.mapstruct.Mapper;
-import sonia.scm.repository.Repository;
 import org.mapstruct.Mapping;
+import sonia.scm.repository.Repository;
 
 import java.time.Instant;
 

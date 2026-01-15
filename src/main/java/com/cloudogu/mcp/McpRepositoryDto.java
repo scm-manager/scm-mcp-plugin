@@ -16,13 +16,12 @@
 
 package com.cloudogu.mcp;
 
-import de.otto.edison.hal.Link;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -35,5 +34,5 @@ public class McpRepositoryDto {
   private String contact;
   private Instant creationDate;
   private boolean archived;
-  private List<Link> protocolLinks;
+  private Map<String, String> protocolLinks;
 }

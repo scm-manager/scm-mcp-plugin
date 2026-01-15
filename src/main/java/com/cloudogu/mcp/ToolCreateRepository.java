@@ -18,15 +18,13 @@ package com.cloudogu.mcp;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.annotations.VisibleForTesting;
-import de.otto.edison.hal.Link;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import sonia.scm.AlreadyExistsException;
 import sonia.scm.config.ScmConfiguration;
 import sonia.scm.plugin.Extension;
 import sonia.scm.repository.NamespaceStrategy;
@@ -36,9 +34,11 @@ import sonia.scm.repository.api.RepositoryService;
 import sonia.scm.repository.api.RepositoryServiceFactory;
 import sonia.scm.repository.api.ScmProtocol;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import static com.cloudogu.mcp.OkResultRenderer.success;
 
 @Slf4j
 @Extension
@@ -82,43 +82,36 @@ class ToolCreateRepository implements TypedTool<CreateRepositoryInput> {
   @Override
   public ToolResult execute(CreateRepositoryInput input) {
     log.trace("executing request {}", input);
-    try {
-      Repository repository = repositoryManager.create(
-        new Repository(
-          null,
-          input.getType().name(),
-          input.getNamespace(),
-          input.getName(),
-          input.getContact(),
-          input.getDescription()
-        )
-      );
+    Repository repository = repositoryManager.create(
+      new Repository(
+        null,
+        input.getType().name(),
+        input.getNamespace(),
+        input.getName(),
+        input.getContact(),
+        input.getDescription()
+      )
+    );
 
-      log.trace("created new repository {}", repository);
+    log.trace("created new repository {}", repository);
 
-      McpRepositoryDto dto = repositoryMapper.toDto(repository);
-      try (RepositoryService repositoryService = repositoryServiceFactory.create(repository)) {
-        dto.setProtocolLinks(
-          repositoryService.getSupportedProtocols()
-            .map(this::createProtocolLink)
-            .toList()
-        );
-      }
+    McpRepositoryDto dto = repositoryMapper.toDto(repository);
+    Map<String, String> protocolLinks = getProtocolLinks(repository);
+    dto.setProtocolLinks(protocolLinks);
 
-      return ToolResult.ok(
-        List.of(repository.getNamespaceAndName().toString()),
-        Map.of("repository", dto)
-      );
-    } catch (AlreadyExistsException existsException) {
-      log.trace("repository already exists", existsException);
-      return ToolResult.error(
-        "A repository with this namespace and name already exists"
-      );
-    }
+    return success(String.format("The repository '%s' has been created successfully.", repository.getNamespaceAndName()))
+      .withInfoText("The repository can be viewed or cloned using the url " + protocolLinks.get("http"))
+      .render(Map.of("repository", dto));
   }
 
-  private Link createProtocolLink(ScmProtocol protocol) {
-    return Link.link(protocol.getType(), protocol.getUrl());
+  private Map<String, String> getProtocolLinks(Repository repository) {
+    try (RepositoryService repositoryService = repositoryServiceFactory.create(repository)) {
+      return repositoryService.getSupportedProtocols()
+        .collect(Collectors.toMap(
+          ScmProtocol::getType,
+          ScmProtocol::getUrl
+        ));
+    }
   }
 
   private static boolean isRenameNamespacePossible(ScmConfiguration scmConfiguration, Set<NamespaceStrategy> strategies) {
@@ -147,7 +140,8 @@ interface CreateRepositoryInput {
 @Getter
 @ToString(callSuper = true)
 class CreateRepositoryInputWithNamespace extends CreateRepositoryInputWithoutNamespace {
-  @NotNull // Marks this field as required in the schema
+  @NotEmpty
+  @Pattern(regexp = Validations.REPOSITORY_NAMESPACE_REGEX)
   @JsonPropertyDescription("The namespace for the new repository")
   private String namespace;
 }
@@ -156,9 +150,9 @@ class CreateRepositoryInputWithNamespace extends CreateRepositoryInputWithoutNam
 @ToString
 class CreateRepositoryInputWithoutNamespace implements CreateRepositoryInput {
 
-  @NotNull
-  @JsonPropertyDescription("The name for the new repository")
+  @NotEmpty
   @Pattern(regexp = Validations.REPOSITORY_NAME_REGEX)
+  @JsonPropertyDescription("The name for the new repository")
   private String name;
 
   @JsonPropertyDescription("The type of the new repository. This must be either 'git', 'hg', or 'svn'")

@@ -16,6 +16,11 @@
 
 package com.cloudogu.mcp;
 
+import sonia.scm.repository.Branch;
+import sonia.scm.util.ValidationUtil;
+
 class Validations {
-  static final String REPOSITORY_NAME_REGEX = "(?!^\\.\\.$)(?!^\\.$)(?!.*[\\\\\\[\\]])(?!.*[.]git$)^[A-Za-z0-9.][A-Za-z0-9.\\-_]*$";
+  static final String REPOSITORY_NAME_REGEX = ValidationUtil.REGEX_REPOSITORYNAME;
+  static final String REPOSITORY_NAMESPACE_REGEX = ValidationUtil.REGEX_NAME;
+  static final String BRANCH_REGEX = Branch.VALID_BRANCH_NAMES;
 }
