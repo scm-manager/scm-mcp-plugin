@@ -8,17 +8,26 @@ Sie ist in verschiedenen Sprachen und Versionen verfügbar, die im Menü auf der
 
 Das MCP-Plugin fügt einen MCP-Endpunkt hinzu, sodass der SCM-Manager von KI-Systemen als MCP-Server verwendet werden kann.
 
-Sie müssen ein Bearer Token bereitstellen, um sich zu verbinden. 
-Es stehen verschiedene Tools zur Verfügung, wie zum Beispiel das Auflisten aller Repositories, 
-das Ändern von Dateien in Repositories oder die globale SCM-Manager Suche. 
-Andere Plugins können zusätzliche Tools hinzufügen.
+Für die Verbindung muss ein Bearer Token bereitgestellt werden. Dieser kann am einfachsten in From eines API-Schlüssels
+für ein entsprechendes Nutzerkonto erstellt werden.
+
+Es stehen verschiedene Tools zur Verfügung, wie zum Beispiel
+
+- Auflisten und Erstellen von Repositories,
+- Auflisten und Erstellen von Branches,
+- Auflisten, Lesen, Erstellen, Ändern, Umbenennen und Löschen von Dateien in Repositories,
+- Auflisten und Lesen von Commits, oder
+- die globale SCM-Manager Suche.
+
+Wenn weitere Plugins installiert sind, können diese zusätzliche Tools hinzufügen, wie z. B. das Lesen und Erstellen
+von Pull Requests im Review Plugin.
 
 Wenn Sie sich einen Überblick über die Funktionen verschaffen möchten, verbinden Sie sich am besten mit dem
 [MCP Inspector](https://github.com/modelcontextprotocol/inspector?tab=readme-ov-file#mcp-inspector). 
 Führen Sie dazu `npx @modelcontextprotocol/inspector@latest` aus. 
 Wenn dies funktioniert, sehen Sie eine neue Seite in Ihrem Webbrowser, die ungefähr so aussehen sollte:
 
-![Screenshot of MCP Inspector in a web browser](./assets/mcp_inspector.png)
+![Screenshot des MCP Inspector im Web-Browser](./assets/mcp_inspector.png)
 
 Um sich mit Ihrem SCM-Manager zu verbinden, müssen Sie:
 
@@ -32,3 +41,7 @@ Um sich mit Ihrem SCM-Manager zu verbinden, müssen Sie:
 - Auf die Schaltfläche "Connect" klicken.
 - Wenn die Verbindung erfolgreich war, finden Sie die Tools, indem Sie oben auf der Seite "Tools" auswählen und auf
    "List Tools" klicken.
+
+Wenn die Verbindung an eine KI erfolgreich war, kann aber auch diese meist eine Übersicht darüber geben, was möglich ist:
+
+![Screenshot einer KI Antwort auf die Frage, welche Funktionen zur Verfügung stehen](./assets/ai_overview.png)

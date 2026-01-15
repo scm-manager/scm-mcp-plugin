@@ -6,9 +6,19 @@ This documentation describes the usage of the scm-mcp-plugin.
 It is available in different languages and versions, which can be selected in the menu on the right.
 
 The MCP plugin adds an MCP endpoint so that SCM-Manager can be used as an MCP server by AI systems.
-You have to provide a bearer token to connect. 
-There are different tools available, like listing all repositories, modifying files in repositories, or searching. 
-Other plugins may add additional tools.
+You have to provide a bearer token to connect.
+
+A bearer token is needed for the connection. This can be created most easily as an API key for a user account.
+
+There are different tools available, like
+
+- listing and creating repositories,
+- listing and creating branches,
+- listing, reading, creating, modifying, moving, and deletion of files in repositories,
+- listing and reading commits, or
+- the global search.
+
+Other plugins may add additional tools, like the review plugin that adds tools to read and create pull requests.
 
 If you like to get an overview about the capabilities, it's best to connect using the
 [MCP Inspector](https://github.com/modelcontextprotocol/inspector?tab=readme-ov-file#mcp-inspector). 
@@ -28,3 +38,7 @@ To connect to your SCM-Manager, you have to
    after the start of the MCP inspector as "Session token".
 - Click the "Connect" button.
 - If the connection is successful, you will find the tools by selecting "Tools" on the top of the page and clicking "List Tools".
+
+If you have a working connection to an AI, you can also ask this one about the capabilities:
+
+![Screenshot of an AI answer to the question, what functionality is available](./assets/ai_overview.png)
