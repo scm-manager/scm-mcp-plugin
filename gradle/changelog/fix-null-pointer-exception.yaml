@@ -1,0 +1,2 @@
+- type: fixed
+  description: Null Pointer Exception in cases, where a scm mcp tool returns null for the structured content

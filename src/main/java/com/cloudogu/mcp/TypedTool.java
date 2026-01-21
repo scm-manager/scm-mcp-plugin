@@ -69,11 +69,15 @@ public interface TypedTool<I> extends Tool {
       return builder().addTextContent(result.getMessage()).isError(true).build();
     } else {
       LOGGER.trace("request successful");
-      return builder()
+      McpSchema.CallToolResult.Builder builder = builder()
         .textContent(result.getContent())
-        .isError(false)
-        .structuredContent(result.getStructuredContent())
-        .build();
+        .isError(false);
+
+      if (result.getStructuredContent() != null) {
+        builder.structuredContent(result.getStructuredContent());
+      }
+
+      return builder.build();
     }
   }
 
