@@ -20,6 +20,7 @@ import io.modelcontextprotocol.server.McpSyncServerExchange;
 import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.UnauthorizedException;
 import sonia.scm.AlreadyExistsException;
 import sonia.scm.ContextEntry;
 import sonia.scm.ExceptionWithContext;
@@ -46,6 +47,9 @@ final class ExceptionHandlingToolExecutorFactory {
     return (exchange, request) -> {
       try {
         return tool.execute(exchange, request);
+      } catch (UnauthorizedException e) {
+        log.trace("not authorized", e);
+        return builder().addTextContent("The current user does not have the permission to do this.").isError(true).build();
       } catch (NotFoundException e) {
         log.trace("got not found exception", e);
         String context = buildContextString(e);

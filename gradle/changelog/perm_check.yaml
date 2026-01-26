@@ -1,0 +1,2 @@
+- type: fixed
+  description: Handle unauthorized exceptions to prevent internal server errors
