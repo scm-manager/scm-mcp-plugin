@@ -22,8 +22,8 @@ dependencies {
   // define dependencies to other plugins here e.g.:
   // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
   // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation "io.modelcontextprotocol.sdk:mcp:0.17.0"
-  implementation "io.modelcontextprotocol.sdk:mcp-json-jackson2:0.17.0"
+  implementation "io.modelcontextprotocol.sdk:mcp:0.17.2"
+  implementation "io.modelcontextprotocol.sdk:mcp-json-jackson2:0.17.2"
   implementation "com.github.victools:jsonschema-generator:4.38.0"
   implementation "com.github.victools:jsonschema-module-jackson:4.38.0"
   implementation "com.github.victools:jsonschema-module-jakarta-validation:4.38.0"
@@ -49,6 +49,6 @@ scmPlugin {
 // fix resolution error
 configurations.all {
   resolutionStrategy {
-    force 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    force 'com.fasterxml.jackson.core:jackson-databind:2.21.0'
   }
 }
