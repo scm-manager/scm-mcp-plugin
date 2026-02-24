@@ -1,0 +1,4 @@
+- type: added
+  description: Extension point for diff tool
+- type: changed
+  description: Enhanced diff tool with filtering, limits, comparison between branches, and option to ignore whitespaces
