@@ -49,6 +49,6 @@ scmPlugin {
 // fix resolution error
 configurations.all {
   resolutionStrategy {
-    force 'com.fasterxml.jackson.core:jackson-databind:2.21.0'
+    force 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
   }
 }
