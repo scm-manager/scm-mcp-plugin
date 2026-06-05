@@ -71,6 +71,44 @@ class ContentFormatterTest {
   }
 
   @Test
+  void shouldWriteTruncatedResultWithoutTotal() {
+    ContentFormatter formatter = new ContentFormatter("README.md");
+
+    OkResultRenderer resultRenderer = formatter.write(ContentFormatter.Status.TRUNCATED, CONTENT, 8);
+
+    assertThat(resultRenderer).asString()
+      .isEqualTo("""
+        STATUS: [TRUNCATED] Showing lines 8-11 of `README.md`.
+        ---------------------------------------------------------
+        ```
+         8 | # Heart of Gold
+         9 |\s
+        10 | A spacecraft equipped with
+        11 | Infinite Improbability Drive.
+        ```
+        """);
+  }
+
+  @Test
+  void shouldWriteTruncatedResultWithTotal() {
+    ContentFormatter formatter = new ContentFormatter("README.md");
+
+    OkResultRenderer resultRenderer = formatter.write(ContentFormatter.Status.TRUNCATED, CONTENT, 8, null, 42);
+
+    assertThat(resultRenderer).asString()
+      .isEqualTo("""
+        STATUS: [TRUNCATED] Showing lines 8-11 of `README.md`. The file contains 42 lines in total.
+        ---------------------------------------------------------
+        ```
+         8 | # Heart of Gold
+         9 |\s
+        10 | A spacecraft equipped with
+        11 | Infinite Improbability Drive.
+        ```
+        """);
+  }
+
+  @Test
   void shouldFormatInfo() {
     ContentFormatter formatter = new ContentFormatter("README.md");
 

@@ -152,7 +152,7 @@ class ToolReadFile implements TypedTool<ReadFilesInput> {
       info = info + " The detected language is " + getLanguage(contentType).get() + '.';
     }
 
-    return new ContentFormatter(path).write(status, readResult.lines, start, info);
+    return new ContentFormatter(path).write(status, readResult.lines, start, info, readResult.overallLineCount);
   }
 
   private ReadResult readLines(InputStream inputStream, int startLine, int endLine) throws IOException {
@@ -169,11 +169,10 @@ class ToolReadFile implements TypedTool<ReadFilesInput> {
         }
 
         if (currentLineNumber >= endLine) {
-          moreAvailable = reader.ready();
-          break;
+          moreAvailable |= reader.ready();
         }
       }
-      return new ReadResult(moreAvailable, lines);
+      return new ReadResult(moreAvailable, lines, currentLineNumber);
     }
   }
 
@@ -198,7 +197,7 @@ class ToolReadFile implements TypedTool<ReadFilesInput> {
     }
   }
 
-  private record ReadResult(boolean moreAvailable, List<String> lines) {
+  private record ReadResult(boolean moreAvailable, List<String> lines, int overallLineCount) {
   }
 }
 

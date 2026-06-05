@@ -43,10 +43,19 @@ public class ContentFormatter {
   }
 
   public OkResultRenderer write(Status status, Collection<String> lines, int firstLineNumber, String info) {
+    return write(status, lines, firstLineNumber, info, null);
+  }
+
+  public OkResultRenderer write(Status status, Collection<String> lines, int firstLineNumber, String info, Integer overallLineCount) {
     OkResultRenderer resultRenderer;
     switch (status) {
-      case TRUNCATED ->
-        resultRenderer = OkResultRenderer.ok("TRUNCATED", String.format("Showing lines %s-%s of `%s`.", firstLineNumber, firstLineNumber + lines.size() - 1, file));
+      case TRUNCATED -> {
+        if (overallLineCount != null) {
+          resultRenderer = OkResultRenderer.ok("TRUNCATED", String.format("Showing lines %s-%s of `%s`. The file contains %s lines in total.", firstLineNumber, firstLineNumber + lines.size() - 1, file, overallLineCount));
+        } else {
+          resultRenderer = OkResultRenderer.ok("TRUNCATED", String.format("Showing lines %s-%s of `%s`.", firstLineNumber, firstLineNumber + lines.size() - 1, file));
+        }
+      }
       case COMPLETE ->
         resultRenderer = OkResultRenderer.ok("COMPLETE", String.format("Showing all lines %s-%s of `%s`.", firstLineNumber, firstLineNumber + lines.size() - 1, file));
       case EMPTY -> resultRenderer = OkResultRenderer.ok("EMPTY", String.format("Range outside of file bounds of `%s`.", file));

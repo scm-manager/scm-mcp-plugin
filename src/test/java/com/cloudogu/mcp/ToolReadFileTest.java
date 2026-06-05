@@ -136,7 +136,7 @@ class ToolReadFileTest {
 
         assertThat(result.isError()).isFalse();
         assertThat(result.getContent().get(0)).isEqualTo("""
-          STATUS: [TRUNCATED] Showing lines 1-3 of `README.md`.
+          STATUS: [TRUNCATED] Showing lines 1-3 of `README.md`. The file contains 4 lines in total.
           INFO: The content type for this file is text/x-web-markdown. The detected language is Markdown.
           ---------------------------------------------------------
           ```
@@ -155,7 +155,7 @@ class ToolReadFileTest {
 
         assertThat(result.isError()).isFalse();
         assertThat(result.getContent().get(0)).isEqualTo("""
-          STATUS: [TRUNCATED] Showing lines 2-3 of `README.md`.
+          STATUS: [TRUNCATED] Showing lines 2-3 of `README.md`. The file contains 4 lines in total.
           INFO: The content type for this file is text/x-web-markdown. The detected language is Markdown.
           ---------------------------------------------------------
           ```
