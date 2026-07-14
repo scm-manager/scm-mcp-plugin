@@ -37,10 +37,12 @@ import static com.cloudogu.mcp.OkResultRenderer.success;
 class ToolCreateBranch implements TypedTool<CreateBranchInput> {
 
   private final RepositoryServiceFactory repositoryServiceFactory;
+  private final BranchFrontendLinkResolver linkResolver;
 
   @Inject
-  ToolCreateBranch(RepositoryServiceFactory repositoryServiceFactory) {
+  ToolCreateBranch(RepositoryServiceFactory repositoryServiceFactory, BranchFrontendLinkResolver linkResolver) {
     this.repositoryServiceFactory = repositoryServiceFactory;
+    this.linkResolver = linkResolver;
   }
 
   @Override
@@ -71,7 +73,16 @@ class ToolCreateBranch implements TypedTool<CreateBranchInput> {
       .from(input.getBaseBranch())
       .branch(input.getNewBranchName());
 
-    return success(String.format("The new branch `%s` has been created on revision %s.", newBranch.getName(), newBranch.getRevision())).render();
+    return success(String.format("The new branch [%s](%s) has been created on revision %s.", newBranch.getName(), createFrontendLink(input).url(), newBranch.getRevision())).render();
+  }
+
+  private FrontendLinkResult createFrontendLink(CreateBranchInput input) {
+    CreateFrontendLinkInput frontendLinkInput = new CreateFrontendLinkInput();
+    frontendLinkInput.setTargetType("branch");
+    frontendLinkInput.setNamespace(input.getNamespace());
+    frontendLinkInput.setName(input.getName());
+    frontendLinkInput.setRevision(input.getNewBranchName());
+    return linkResolver.createLink(frontendLinkInput);
   }
 
   @Override

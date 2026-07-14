@@ -48,10 +48,20 @@ import static java.util.Collections.emptyList;
 class ToolModifyFiles implements TypedTool<ModifyFilesInput> {
 
   private final RepositoryServiceFactory repositoryServiceFactory;
+  private final CommitFrontendLinkResolver commitLinkResolver;
+  private final FileFrontendLinkResolver fileLinkResolver;
+  private final RepositoryFrontendLinkResolver repositoryLinkResolver;
 
   @Inject
-  public ToolModifyFiles(RepositoryServiceFactory repositoryServiceFactory) {
+  public ToolModifyFiles(RepositoryServiceFactory repositoryServiceFactory,
+                         CommitFrontendLinkResolver commitLinkResolver,
+                         FileFrontendLinkResolver fileLinkResolver,
+                         RepositoryFrontendLinkResolver repositoryLinkResolver
+  ) {
     this.repositoryServiceFactory = repositoryServiceFactory;
+    this.commitLinkResolver = commitLinkResolver;
+    this.fileLinkResolver = fileLinkResolver;
+    this.repositoryLinkResolver = repositoryLinkResolver;
   }
 
   @Override
@@ -119,15 +129,62 @@ class ToolModifyFiles implements TypedTool<ModifyFilesInput> {
     String revision = modifyCommandBuilder
       .execute();
 
-    log.trace("files created");
-    return success(
-      String.format(
-        "Created or modified %s files in revision %s in repository %s/%s",
-        input.getFilesToCreateOrEdit().size(),
-        revision,
-        input.getNamespace(), input.getName()
-      )
-    ).render();
+    log.trace("{} files changed in repository {} with revision {}", input.getFilesToCreateOrEdit().size(), repositoryService.getRepository(), revision);
+    OkResultRenderer resultRenderer = success(String.format(
+      "Created or modified %s files, moved %s files, and deleted %s files in revision [%s](%s) in repository [%s/%s](%s)",
+      input.getFilesToCreateOrEdit().size(),
+      input.getFilesToMove().size(),
+      input.getFilesToDelete().size(),
+      revision,
+      createCommitLink(input, revision),
+      input.getNamespace(),
+      input.getName(),
+      createRepositoryLink(input)
+    ));
+    if (!input.getFilesToCreateOrEdit().isEmpty() || !input.getFilesToMove().isEmpty()) {
+      StringBuilder infoText = new StringBuilder("You can find the modified or moved files here:\n");
+      input.getFilesToCreateOrEdit()
+        .stream()
+        .map(entry -> String.format("- [%s](%s)\n", entry.getPath(), createFileLink(input, entry.getPath(), revision)))
+        .forEach(infoText::append);
+      input.getFilesToMove()
+        .stream()
+        .map(entry -> String.format("- [%s](%s)\n", entry.getToPath(), createFileLink(input, entry.getToPath(), revision)))
+        .forEach(infoText::append);
+      resultRenderer.withInfoText(infoText.toString());
+    }
+    return resultRenderer
+      .render();
+  }
+
+  private String createFileLink(ModifyFilesInput input, String path, String revision) {
+    CreateFrontendLinkInput linkInput = new CreateFrontendLinkInput();
+    linkInput.setTargetType("file");
+    linkInput.setNamespace(input.getNamespace());
+    linkInput.setName(input.getName());
+    linkInput.setRevision(revision);
+    linkInput.setPath(path);
+    FrontendLinkResult result = fileLinkResolver.createLink(linkInput);
+    return result.url();
+  }
+
+  private String createCommitLink(ModifyFilesInput input, String revision) {
+    CreateFrontendLinkInput linkInput = new CreateFrontendLinkInput();
+    linkInput.setTargetType("commit");
+    linkInput.setNamespace(input.getNamespace());
+    linkInput.setName(input.getName());
+    linkInput.setRevision(revision);
+    FrontendLinkResult result = commitLinkResolver.createLink(linkInput);
+    return result.url();
+  }
+
+  private String createRepositoryLink(ModifyFilesInput input) {
+    CreateFrontendLinkInput linkInput = new CreateFrontendLinkInput();
+    linkInput.setTargetType("repository");
+    linkInput.setNamespace(input.getNamespace());
+    linkInput.setName(input.getName());
+    FrontendLinkResult result = repositoryLinkResolver.createLink(linkInput);
+    return result.url();
   }
 
   private void handleDelete(ModifyFilesInput input, ModifyCommandBuilder modifyCommandBuilder) {

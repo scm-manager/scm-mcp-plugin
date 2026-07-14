@@ -45,11 +45,18 @@ import java.util.stream.Collectors;
 public class ToolListCommits implements TypedTool<ToolListCommits.CompositeInput> {
 
   private final RepositoryServiceFactory repositoryServiceFactory;
+  private final CommitFrontendLinkResolver commitLinkResolver;
+  private final TagFrontendLinkResolver tagLinkResolver;
   private final Set<ToolListCommitsFilterEnhancement> extensions;
 
   @Inject
-  public ToolListCommits(RepositoryServiceFactory repositoryServiceFactory, Set<ToolListCommitsFilterEnhancement> extensions) {
+  public ToolListCommits(RepositoryServiceFactory repositoryServiceFactory,
+                         CommitFrontendLinkResolver commitLinkResolver,
+                         TagFrontendLinkResolver tagLinkResolver,
+                         Set<ToolListCommitsFilterEnhancement> extensions) {
     this.repositoryServiceFactory = repositoryServiceFactory;
+    this.commitLinkResolver = commitLinkResolver;
+    this.tagLinkResolver = tagLinkResolver;
     this.extensions = extensions;
   }
 
@@ -111,7 +118,7 @@ public class ToolListCommits implements TypedTool<ToolListCommits.CompositeInput
     int foundCounter = filterResult.matches().size();
 
     Map<String, Object> structuredContent = createStructuredContent(compositeInput, repositoryService, input, filterResult);
-    renderContent(filterResult, resultRenderer);
+    renderContent(input, filterResult, resultRenderer);
 
     OkResultRenderer result;
     if (filterResult.endOfHistory()) {
@@ -123,13 +130,13 @@ public class ToolListCommits implements TypedTool<ToolListCommits.CompositeInput
     return result.render(structuredContent);
   }
 
-  private void renderContent(ChangesetStreamer.FilterResult filterResult, OkResultRenderer.PostponedResultRenderer resultRenderer) {
+  private void renderContent(ListCommitsInput input, ChangesetStreamer.FilterResult filterResult, OkResultRenderer.PostponedResultRenderer resultRenderer) {
     for (Changeset changeset : filterResult.matches()) {
-      resultRenderer.append("commit ").append(changeset.getId());
+      resultRenderer.append("commit [").append(changeset.getId()).append("](").append(createCommitLink(input, changeset.getId())).append(")");
       if (!changeset.getTags().isEmpty() || !changeset.getBranches().isEmpty()) {
         resultRenderer.append(" (");
         if (!changeset.getTags().isEmpty()) {
-          resultRenderer.append(changeset.getTags().stream().map(t -> "tag: " + t).collect(Collectors.joining(", ")));
+          resultRenderer.append(changeset.getTags().stream().map(t -> "tag: [" + t + "](" + createTagLink(input, t) + ")").collect(Collectors.joining(", ")));
         }
         if (!changeset.getBranches().isEmpty()) {
           resultRenderer.append(String.join(", ", changeset.getBranches()));
@@ -143,6 +150,24 @@ public class ToolListCommits implements TypedTool<ToolListCommits.CompositeInput
       resultRenderer.append("    ").append(changeset.getDescription().split("\n")[0]).append("\n");
       resultRenderer.append('\n');
     }
+  }
+
+  private String createCommitLink(ListCommitsInput input, String revision) {
+    CreateFrontendLinkInput linkInput = new CreateFrontendLinkInput();
+    linkInput.setTargetType("commit");
+    linkInput.setNamespace(input.getNamespace());
+    linkInput.setName(input.getName());
+    linkInput.setRevision(revision);
+    return commitLinkResolver.createLink(linkInput).url();
+  }
+
+  private String createTagLink(ListCommitsInput input, String tag) {
+    CreateFrontendLinkInput linkInput = new CreateFrontendLinkInput();
+    linkInput.setTargetType("tag");
+    linkInput.setNamespace(input.getNamespace());
+    linkInput.setName(input.getName());
+    linkInput.setRevision(tag);
+    return tagLinkResolver.createLink(linkInput).url();
   }
 
   private Map<String, Object> createStructuredContent(CompositeInput compositeInput, RepositoryService repositoryService, ListCommitsInput input, ChangesetStreamer.FilterResult filterResult) {

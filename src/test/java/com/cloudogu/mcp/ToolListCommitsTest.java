@@ -48,10 +48,12 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -68,6 +70,10 @@ class ToolListCommitsTest {
   private RepositoryServiceFactory repositoryServiceFactory;
   @Mock
   private RepositoryService repositoryService;
+  @Mock
+  private CommitFrontendLinkResolver commitLinkResolver;
+  @Mock
+  private TagFrontendLinkResolver tagLinkResolver;
 
 
   @Mock(answer = Answers.RETURNS_SELF)
@@ -83,7 +89,7 @@ class ToolListCommitsTest {
 
     @BeforeEach
     void createTool() {
-      tool = new ToolListCommits(repositoryServiceFactory, emptySet());
+      tool = new ToolListCommits(repositoryServiceFactory, commitLinkResolver, tagLinkResolver, emptySet());
     }
 
     @BeforeEach
@@ -97,6 +103,32 @@ class ToolListCommitsTest {
 
       input.setNamespace(REPOSITORY.getNamespace());
       input.setName(REPOSITORY.getName());
+    }
+
+    @BeforeEach
+    void mockLinkResolver() {
+      lenient()
+        .when(commitLinkResolver.createLink(any()))
+        .thenAnswer(input -> {
+          CreateFrontendLinkInput linkInput = input.getArgument(0, CreateFrontendLinkInput.class);
+          return FrontendLinkResult.of(
+            "commit",
+            linkInput.getRevision(),
+            "http://hog.org/scm/" + linkInput.getNamespace() + linkInput.getName() + "/code/changeset/" + linkInput.getRevision(),
+            emptyMap()
+          );
+        });
+      lenient()
+        .when(tagLinkResolver.createLink(any()))
+        .thenAnswer(input -> {
+          CreateFrontendLinkInput linkInput = input.getArgument(0, CreateFrontendLinkInput.class);
+          return FrontendLinkResult.of(
+            "tag",
+            linkInput.getRevision(),
+            "http://hog.org/scm/" + linkInput.getNamespace() + linkInput.getName() + "/tag/" + linkInput.getRevision(),
+            emptyMap()
+          );
+        });
     }
 
     @Nested
@@ -142,13 +174,13 @@ class ToolListCommitsTest {
           .isEqualTo("""
             STATUS: [SUCCESS] Found all 2 commits of 2 in total.
             ---------------------------------------------------------
-            commit 42
+            commit [42](http://hog.org/scm/hitchhikerHeartOfGold/code/changeset/42)
             Author: Trillian McMillan <trish@hog.org>
             Date: 1985-06-01T16:00:00Z
 
                 Fix improbability drive
 
-            commit 23 (tag: 1.0)
+            commit [23](http://hog.org/scm/hitchhikerHeartOfGold/code/changeset/23) (tag: [1.0](http://hog.org/scm/hitchhikerHeartOfGold/tag/1.0))
             Author: Arthur Dent <dent@hog.org>
             Date: 1985-05-23T21:00:00Z
 
@@ -167,7 +199,7 @@ class ToolListCommitsTest {
             STATUS: [SUCCESS] Found all 2 commits of 2 in total.
             INFO: Detailed metadata (complete commit message labeled as 'description', parents, and contributors) for each commit is available in the structured data block under their respective revisions.
             ---------------------------------------------------------
-            commit 42
+            commit [42](http://hog.org/scm/hitchhikerHeartOfGold/code/changeset/42)
             """);
 
         Object commit1 = result.getStructuredContent().get("42");
@@ -304,6 +336,8 @@ class ToolListCommitsTest {
 
           tool = new ToolListCommits(
             repositoryServiceFactory,
+            commitLinkResolver,
+            tagLinkResolver,
             Set.of(
               firstExtension,
               secondExtension,

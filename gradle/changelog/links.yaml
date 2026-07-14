@@ -1,0 +1,2 @@
+- type: added
+  description: Tool to create frontend links for different types of entities (e.g. repositories, files, directories, branches and tags)

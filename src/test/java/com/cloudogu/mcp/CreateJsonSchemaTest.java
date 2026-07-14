@@ -258,7 +258,7 @@ class CreateJsonSchemaTest {
   static Stream<Arguments> provideClassesAndStrings() {
     return Stream.of(
       Arguments.of(new ToolListRepositories(null, null), GET_REPOSITORIES_SCHEMA),
-      Arguments.of(new ToolModifyFiles(null), CREATE_OR_EDIT_FILES_SCHEMA),
+      Arguments.of(new ToolModifyFiles(null, null, null, null), CREATE_OR_EDIT_FILES_SCHEMA),
       Arguments.of(new ToolSearchGlobally(null, Set.of(new RepositorySearchExtension())), SEARCH_GLOBALLY_SCHEMA),
       Arguments.of(new ToolCreateRepository(null, null, false, null), CREATE_REPOSITORY_SCHEMA_WITHOUT_NAMESPACES),
       Arguments.of(new ToolCreateRepository(null, null, true, null), CREATE_REPOSITORY_SCHEMA_WITH_NAMESPACES)
