@@ -68,7 +68,7 @@ public class ProxyResource {
   public Response handleGet(@Context HttpServletRequest request,
                             @Context HttpServletResponse response) throws ServletException, IOException {
     forwardRequest(request, response);
-    return Response.ok().build();
+    return Response.status(response.getStatus()).build();
   }
 
   @POST
@@ -76,7 +76,7 @@ public class ProxyResource {
   public Response handlePost(@Context HttpServletRequest request,
                              @Context HttpServletResponse response) throws ServletException, IOException {
     forwardRequest(request, response);
-    return Response.ok().build();
+    return Response.status(response.getStatus()).build();
   }
 
   private void forwardRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {

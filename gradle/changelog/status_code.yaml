@@ -1,0 +1,2 @@
+- type: fixed
+  description: HTTP status codes in responses for MCP requests
