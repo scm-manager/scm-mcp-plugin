@@ -51,8 +51,7 @@ class CreateJsonSchemaTest {
           "enum" : [ "git", "svn", "hg" ],
           "description" : "If set, list only the repositories with this type."
         }
-      },
-      "id" : "tools/list-repositories"
+      }
     }""";
 
   private static final String CREATE_OR_EDIT_FILES_SCHEMA = """
@@ -144,8 +143,7 @@ class CreateJsonSchemaTest {
           "pattern" : "^(?:(?:[^:/?#;&=\\\\s@%\\\\\\\\][^:/?#;&=%\\\\\\\\]*[^:/?#;&=\\\\s%\\\\\\\\])|(?:[^:/?#;&=\\\\s@%\\\\\\\\]))$"
         }
       },
-      "required" : [ "commitMessage", "name", "namespace" ],
-      "id" : "tools/modify-files"
+      "required" : [ "commitMessage", "name", "namespace" ]
     }""";
 
   private static final String SEARCH_GLOBALLY_SCHEMA = """
@@ -176,8 +174,7 @@ class CreateJsonSchemaTest {
           "default" : "repository"
         }
       },
-      "required" : [ "query", "type" ],
-      "id" : "tools/search-globally"
+      "required" : [ "query", "type" ]
     }""";
 
   private static final String CREATE_REPOSITORY_SCHEMA_WITH_NAMESPACES = """
@@ -213,8 +210,7 @@ class CreateJsonSchemaTest {
           "default" : "git"
         }
       },
-      "required" : [ "name", "namespace" ],
-      "id" : "tools/create-repository"
+      "required" : [ "name", "namespace" ]
     }""";
 
   private static final String CREATE_REPOSITORY_SCHEMA_WITHOUT_NAMESPACES = """
@@ -244,8 +240,7 @@ class CreateJsonSchemaTest {
           "default" : "git"
         }
       },
-      "required" : [ "name" ],
-      "id" : "tools/create-repository"
+      "required" : [ "name" ]
     }""";
 
   @ParameterizedTest(name = "Tool: {0}")

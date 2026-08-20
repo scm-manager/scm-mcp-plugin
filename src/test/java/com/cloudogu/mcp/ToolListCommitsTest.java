@@ -425,8 +425,7 @@ class ToolListCommitsTest {
               }""")
             .contains("""
             },
-            "required" : [ "name", "namespace" ],
-            "id" : "tools/list-commits"
+            "required" : [ "name", "namespace" ]
           }""");
 
           tool.execute(compositeInput);

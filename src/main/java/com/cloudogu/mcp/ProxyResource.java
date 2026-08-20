@@ -18,8 +18,9 @@ package com.cloudogu.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.json.McpJsonMapper;
-import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper;
-import io.modelcontextprotocol.json.schema.jackson.JacksonJsonSchemaValidatorSupplier;
+import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.json.schema.JsonSchemaValidator;
+import io.modelcontextprotocol.json.schema.jackson2.JacksonJsonSchemaValidatorSupplier;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.server.McpSyncServer;
@@ -37,6 +38,7 @@ import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import sonia.scm.EagerSingleton;
 import sonia.scm.SCMContextProvider;
+import sonia.scm.plugin.PluginLoader;
 
 import java.io.IOException;
 import java.util.Map;
@@ -51,9 +53,15 @@ public class ProxyResource {
   private final Map<Tool, String> tools;
   private final HttpServletStreamableServerTransportProvider transportProvider;
   private final ExceptionHandlingToolExecutorFactory executorFactory;
+  private final ClassLoader uberClassLoader;
 
   @Inject
-  public ProxyResource(Set<Tool> tools, ObjectMapper objectMapper, SCMContextProvider scmContextProvider, ExceptionHandlingToolExecutorFactory executorFactory) {
+  public ProxyResource(Set<Tool> tools,
+                       ObjectMapper objectMapper,
+                       SCMContextProvider scmContextProvider,
+                       ExceptionHandlingToolExecutorFactory executorFactory,
+                       PluginLoader pluginLoader) {
+    this.uberClassLoader = pluginLoader.getUberClassLoader();
     this.tools = tools.stream()
       .collect(Collectors.toMap(
         tool -> tool,
@@ -101,11 +109,12 @@ public class ProxyResource {
     return transportProvider;
   }
 
-  private static McpSyncServer buildMcpServer(HttpServletStreamableServerTransportProvider transportProvider, McpJsonMapper jsonMapper, String version) {
+  private McpSyncServer buildMcpServer(HttpServletStreamableServerTransportProvider transportProvider, McpJsonMapper jsonMapper, String version) {
     return McpServer.sync(transportProvider)
       .serverInfo("scm-manager", version)
-      .jsonSchemaValidator(new JacksonJsonSchemaValidatorSupplier().get())
+      .jsonSchemaValidator(createJsonSchemaValidator())
       .jsonMapper(jsonMapper)
+      .validateToolInputs(true)
       .immediateExecution(true)
       .capabilities(McpSchema.ServerCapabilities.builder()
         .resources(true, false)
@@ -116,15 +125,25 @@ public class ProxyResource {
       .build();
   }
 
+  JsonSchemaValidator createJsonSchemaValidator() {
+    Thread thread = Thread.currentThread();
+    ClassLoader originalContextClassLoader = thread.getContextClassLoader();
+    thread.setContextClassLoader(uberClassLoader);
+
+    try {
+      return new JacksonJsonSchemaValidatorSupplier().get();
+    } finally {
+      thread.setContextClassLoader(originalContextClassLoader);
+    }
+  }
+
   private void registerTool(Tool tool, String schema, McpSyncServer server, McpJsonMapper jsonMapper) {
     log.debug("registering tool {}", tool);
     server.addTool(
       McpServerFeatures.SyncToolSpecification.builder()
         .tool(
-          McpSchema.Tool.builder()
-            .name(tool.getName())
+          McpSchema.Tool.builder(tool.getName(), jsonMapper, schema)
             .description(tool.getDescription())
-            .inputSchema(jsonMapper, schema)
             .build()
         )
         .callHandler(executorFactory.executor(tool))

@@ -1,0 +1,2 @@
+- type: fixed
+  description: Update of MCP library to fix CVE-2026-34237 and CVE-2026-35568

@@ -257,13 +257,8 @@ public class ToolListCommits implements TypedTool<ToolListCommits.CompositeInput
 
     }
 
-    // 6. Final Polish
-    // If we added a namespace that collided or created weird state, Jackson handles the JSON structure,
-    // but the 'id' helps debugging.
-    rootSchema.put("id", "tools/" + getName());
-
     // Clean up: if 'required' is empty (no fields were mandatory), strictly speaking it's valid,
-    // but some parsers prefer it removed. Optional step.
+    // but some parsers prefer it removed.
     if (rootRequired.isEmpty()) {
       rootSchema.remove("required");
     }

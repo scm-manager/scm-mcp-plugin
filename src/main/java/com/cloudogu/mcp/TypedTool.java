@@ -106,7 +106,6 @@ public interface TypedTool<I> extends Tool {
    */
   default String getInputSchema() {
     ObjectNode schemaNode = GENERATOR.generateSchema(getInputClass());
-    schemaNode.put("id", "tools/" + getName());
     String schema = schemaNode.toPrettyString();
     LOGGER.trace("created json schema for class {}:\n{}", getInputClass(), schema);
     return schema;
